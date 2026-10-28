@@ -200,7 +200,7 @@ That said, this is a hobby project tested on one machine. Use it at your own ris
 
 Two businesses share one workshop in Framingham, Massachusetts, and they did the cleaning and repaste on this Mac:
 
-- **MacBook Clinic** does board-level repair: diagnosing and replacing individual components on the logic board, the kind of work most shops won't attempt and that Apple will only fix by replacing the whole board. In my experience their board work is as good as anyone's.
+- **[MacBook Clinic](https://www.ahatron.com/)** (AhaTron Tech) does board-level repair: diagnosing and replacing individual components on the logic board, the kind of work most shops won't attempt and that Apple will only fix by replacing the whole board. In my experience their board work is as good as anyone's.
 - **[Orramac Computer Services](https://orramac.com)** handles everyday break-fix work: fans, thermal paste, batteries, displays, ports and upgrades, plus data recovery. They support every generation of Mac, vintage ones included.
 
 Both take Macs by mail from anywhere in the US, so you don't need to be local. If your Intel MacBook Pro runs hot and you'd rather not open it yourself, they're who I'd send it to.
