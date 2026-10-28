@@ -17,7 +17,7 @@ This README is also the story of how I got here, because most of what I tried fi
 
 ### 1. Dirty fans and dried-out paste
 
-The Mac ran hot and loud for years. My local repair shop, MacBook Clinic and [Orramac Computer Services](https://orramac.com) in Framingham, Massachusetts, opened it up. The fans were filthy and the factory thermal paste had dried into something like paint chips. They cleaned the fans and replaced the paste with a **Honeywell PTM7950** phase-change pad. It's a sheet that melts into the gaps at operating temperature and doesn't pump out or dry out the way paste does. (They also take Macs by mail if you'd rather not open yours.)
+The Mac ran hot and loud for years. My local repair shop in Framingham, Massachusetts opened it up (see [Where I get my Macs fixed](#where-i-get-my-macs-fixed)). The fans were filthy and the factory thermal paste had dried into something like paint chips. They cleaned the fans and replaced the paste with a **Honeywell PTM7950** phase-change pad. It's a sheet that melts into the gaps at operating temperature and doesn't pump out or dry out the way paste does.
 
 If you'd rather do it yourself, iFixit's teardown of this model shows how it comes apart: [MacBook Pro 16" 2019 Teardown](https://www.ifixit.com/Teardown/MacBook+Pro+16-Inch+2019+Teardown/128106). iFixit rates it 1 out of 10 for repairability. The CPU and GPU share one heatsink and heatpipe assembly, which turns out to matter a lot (see section 5).
 
@@ -195,6 +195,15 @@ This writes to your Mac's System Management Controller. Here is what's in place 
 - `autopower` and `export-guard` only use Apple's own `pmset` and `powermetrics`.
 
 That said, this is a hobby project tested on one machine. Use it at your own risk.
+
+## Where I get my Macs fixed
+
+Two businesses share one workshop in Framingham, Massachusetts, and they did the cleaning and repaste on this Mac:
+
+- **MacBook Clinic** does board-level repair: diagnosing and replacing individual components on the logic board, the kind of work most shops won't attempt and that Apple will only fix by replacing the whole board. In my experience their board work is as good as anyone's.
+- **[Orramac Computer Services](https://orramac.com)** handles everyday break-fix work: fans, thermal paste, batteries, displays, ports and upgrades, plus data recovery. They support every generation of Mac, vintage ones included.
+
+Both take Macs by mail from anywhere in the US, so you don't need to be local. If your Intel MacBook Pro runs hot and you'd rather not open it yourself, they're who I'd send it to.
 
 ## License
 
