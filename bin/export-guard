@@ -1,0 +1,57 @@
+#!/bin/bash
+# Run heavy work at full speed (Low Power Mode off) and pause it whenever the CPU gets too hot.
+#   export-guard -a NAME      guard a running app by name, e.g. export-guard -a Lightroom
+#   export-guard -p PID       guard any running process and its children
+#   export-guard -- CMD ...   run CMD under the guard, e.g. export-guard -- make -j8
+# Pauses (SIGSTOP) at HI C, resumes (SIGCONT) at LO C. Ctrl-C ends it. On exit it always
+# resumes the work and turns Low Power Mode back on.
+HI=${HI:-92} LO=${LO:-85} IDLE_MIN=${IDLE_MIN:-3}
+LOG=$HOME/Library/Logs/export-guard.log
+
+say() { echo "$(date '+%T') $*" | tee -a "$LOG"; }
+temp() { sudo -n /usr/bin/powermetrics -n 1 -i 1000 --samplers smc 2>/dev/null | awk -F': ' '/CPU die temp/{printf "%.0f", $2}'; }
+tree() { local k; echo "$1"; for k in $(pgrep -P "$1"); do tree "$k"; done; }
+sig() { kill -"$1" $(tree "$ROOT") 2>/dev/null; }
+
+sudo -n true 2>/dev/null || { echo "export-guard needs passwordless sudo for powermetrics and pmset"; exit 1; }
+cmd=0
+case "$1" in
+  -p) ROOT=$2 ;;
+  --) shift; "$@" & ROOT=$!; cmd=1 ;;
+  -a) ROOT=$(pgrep -o -f "$2[^/]*\.app/Contents/MacOS/")
+      [ -n "$ROOT" ] || { echo "$2 isn't running. Start it (and the export), then run export-guard again."; exit 1; } ;;
+  *) echo "usage: export-guard [-a APP | -p PID | -- command ...]"; exit 1 ;;
+esac
+kill -0 "$ROOT" 2>/dev/null || { echo "no process $ROOT"; exit 1; }
+
+paused=0 pauses=0 peak=0 idle=0 t0=$SECONDS
+# When the autopower service runs, it owns Low Power Mode; only pause/resume here.
+pgrep -f /usr/local/libexec/autopower >/dev/null && auto=1 || auto=0
+lpm() { [ "$auto" = 1 ] || sudo -n /usr/bin/pmset -a lowpowermode "$1" 2>/dev/null; }
+finish() {
+  [ "$paused" = 1 ] && sig CONT
+  lpm 1
+  say "done after $(( (SECONDS-t0)/60 )) min: peak ${peak}C, paused $pauses times.$([ "$auto" = 1 ] || echo ' Low Power Mode back on.')"
+}
+trap finish EXIT
+trap 'exit 130' INT TERM HUP
+
+lpm 0
+say "guarding $(ps -o comm= -p "$ROOT" | sed 's#.*/##') (pid $ROOT): $([ "$auto" = 1 ] && echo 'autopower manages Low Power Mode' || echo 'Low Power Mode off'), pause at ${HI}C, resume at ${LO}C"
+while kill -0 "$ROOT" 2>/dev/null; do
+  t=$(temp); [ -z "$t" ] && { sleep 1; continue; }
+  [ "$t" -gt "$peak" ] && peak=$t
+  if [ "$paused" = 0 ] && [ "$t" -ge "$HI" ]; then
+    sig STOP; paused=1; pauses=$((pauses+1)); say "PAUSE at ${t}C"
+  elif [ "$paused" = 1 ] && [ "$t" -le "$LO" ]; then
+    sig CONT; paused=0; say "resume at ${t}C"
+  fi
+  # A guarded app (not a command) that has gone quiet for IDLE_MIN minutes means the export is done.
+  if [ "$cmd" = 0 ] && [ "$paused" = 0 ]; then
+    cpu=$(ps -o %cpu= -p $(tree "$ROOT") 2>/dev/null | awk '{s+=$1} END{printf "%.0f", s}')
+    if [ "${cpu:-0}" -lt 15 ]; then idle=$((idle+1)); else idle=0; fi
+    [ "$idle" -ge $((IDLE_MIN*30)) ] && { say "work looks finished (quiet for ${IDLE_MIN} min)"; break; }
+  fi
+  sleep 1
+done
+[ "$cmd" = 1 ] && wait "$ROOT" 2>/dev/null

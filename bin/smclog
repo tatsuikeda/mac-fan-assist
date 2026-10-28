@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+# Every 30 s, append one JSON line with all SMC temperatures, fan speeds and the macOS CPU speed
+# limit to ~/Library/Logs/smclog/YYYY-MM-DD.jsonl. Keeps 14 days. Run by local.smclog LaunchAgent.
+import json, os, re, subprocess, time, glob
+DIR = os.path.expanduser("~/Library/Logs/smclog")
+os.makedirs(DIR, exist_ok=True)
+
+def ismc(what):
+    out = subprocess.run(["/usr/local/bin/iSMC", what, "-o", "json"], capture_output=True, text=True, timeout=20).stdout
+    return json.loads(out or "{}")
+
+while True:
+    try:
+        temps = {v["key"]: round(v["quantity"], 1) for v in ismc("temp").values()}
+        fans = {k.replace(" Speed", ""): v.get("quantity", v.get("value")) for k, v in ismc("fans").items()
+                if "Current" in k or "Target" in k}
+        therm = subprocess.run(["/usr/bin/pmset", "-g", "therm"], capture_output=True, text=True).stdout
+        lim = {m[0]: int(m[1]) for m in re.findall(r"(CPU_\w+_Limit)\s*=\s*(\d+)", therm)}
+        lpm = re.search(r"lowpowermode\s+(\d)", subprocess.run(["/usr/bin/pmset", "-g"], capture_output=True, text=True).stdout)
+        rec = {"t": time.strftime("%F %T"), "lpm": int(lpm[1]) if lpm else None, **lim, "fans": fans, "temps": temps}
+        with open(os.path.join(DIR, time.strftime("%F") + ".jsonl"), "a") as f:
+            f.write(json.dumps(rec) + "\n")
+        for old in sorted(glob.glob(os.path.join(DIR, "*.jsonl")))[:-14]:
+            os.remove(old)
+    except Exception as e:
+        with open(os.path.join(DIR, "errors.log"), "a") as f:
+            f.write(f"{time.strftime('%F %T')} {e}\n")
+    time.sleep(30)

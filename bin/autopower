@@ -1,0 +1,27 @@
+#!/bin/bash
+# Automatic power mode: Low Power Mode stays off for snappy bursts, and turns on when the CPU
+# stays hot (HOT C for HOT_N samples, 2 s apart). It turns off again after COOL_N samples at or
+# below COOL C. Runs as root from /Library/LaunchDaemons/local.autopower.plist.
+# Installed by install.sh --with-autopower.
+HOT=${HOT:-90} HOT_N=${HOT_N:-3} COOL=${COOL:-75} COOL_N=${COOL_N:-30}
+LOG=/Library/Logs/autopower.log
+
+say() { echo "$(date '+%F %T') $*" >> "$LOG"; }
+lpm() { /usr/bin/pmset -a lowpowermode "$1" 2>/dev/null; }
+# Never leave the Mac at full power unattended if this service stops.
+trap 'lpm 1; say "stopped: Low Power Mode on"' EXIT
+
+lpm 0; on=0 hot=0 cool=0
+say "started: Low Power Mode off (on at ${HOT}C for $((HOT_N*2)) s, off at ${COOL}C for $((COOL_N*2)) s)"
+/usr/bin/powermetrics -i 2000 --samplers smc 2>/dev/null |
+while IFS= read -r line; do
+  case "$line" in *"CPU die temperature"*) ;; *) continue ;; esac
+  t=$(echo "$line" | awk -F': ' '{printf "%.0f", $2}')
+  if [ "$on" = 0 ]; then
+    if [ "$t" -ge "$HOT" ]; then hot=$((hot+1)); else hot=0; fi
+    [ "$hot" -ge "$HOT_N" ] && { lpm 1; on=1; cool=0; say "HOT ${t}C: Low Power Mode on"; }
+  else
+    if [ "$t" -le "$COOL" ]; then cool=$((cool+1)); else cool=0; fi
+    [ "$cool" -ge "$COOL_N" ] && { lpm 0; on=0; hot=0; say "cool ${t}C: Low Power Mode off"; }
+  fi
+done

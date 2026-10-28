@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+# Stress test: 12 busy threads, all SMC temps sampled ~every 2 s, stop at 95C core or MAXS seconds,
+# then 90 s of cooldown sampling. Prints sensors ranked by peak and by rise.
+import json, subprocess, sys, time, signal
+MAXS = int(sys.argv[1]) if len(sys.argv) > 1 else 300
+OUT = sys.argv[2] if len(sys.argv) > 2 else "stress.jsonl"
+def temps():
+    o = subprocess.run(["/usr/local/bin/iSMC", "temp", "-o", "json"], capture_output=True, text=True, timeout=20).stdout
+    return {v["key"]: (k, round(v["quantity"], 1)) for k, v in json.loads(o).items()}
+def fans():
+    o = json.loads(subprocess.run(["/usr/local/bin/iSMC", "fans", "-o", "json"], capture_output=True, text=True).stdout)
+    return [v.get("quantity") for k, v in o.items() if "Current" in k]
+procs = []
+def stop(*_):
+    for p in procs: p.kill()
+signal.signal(signal.SIGTERM, lambda *a: (stop(), sys.exit(1)))
+names, rows = {}, []
+def rec(phase, t0):
+    t = temps(); names.update({k: n for k, (n, _) in t.items()})
+    r = {"s": round(time.time() - t0), "phase": phase, "fans": fans(), "t": {k: v for k, (_, v) in t.items()}}
+    rows.append(r); open(OUT, "a").write(json.dumps(r) + "\n"); return r
+t0 = time.time(); base = rec("idle", t0)
+try:
+    procs = [subprocess.Popen(["yes"], stdout=subprocess.DEVNULL) for _ in range(12)]
+    why = f"ran full {MAXS} s"
+    while time.time() - t0 < MAXS:
+        r = rec("load", t0); core = max(v for k, v in r["t"].items() if k.startswith("TC") and k.endswith("C"))
+        print(f'{r["s"]:4d}s core {core:.0f}C fans {r["fans"]}', flush=True)
+        if core >= 95: why = f"stopped at {core:.0f}C core"; break
+        time.sleep(1)
+finally:
+    stop()
+print(why); tl = time.time()
+while time.time() - tl < 90: rec("cool", t0); time.sleep(3)
+load = [r for r in rows if r["phase"] == "load"]
+peak = {k: max(r["t"][k] for r in load) for k in base["t"]}
+end = rows[-1]["t"]
+print(f'\n{"key":5} {"sensor":28} {"idle":>5} {"peak":>5} {"rise":>5} {"90s after":>9}')
+for k in sorted(peak, key=lambda k: -(peak[k] - base["t"][k])):
+    print(f'{k:5} {names[k][:28]:28} {base["t"][k]:5.1f} {peak[k]:5.1f} {peak[k]-base["t"][k]:5.1f} {end[k]:9.1f}')

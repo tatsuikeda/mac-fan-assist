@@ -1,0 +1,55 @@
+#!/bin/bash
+# Multi-sensor fan assist: Apple's Auto curve watches the CPU and reacts slowly, while the GPU,
+# heatpipe and battery heat up too. Every 2 s this reads CPU, GPU, heatpipe and battery, works out
+# how close each is to its limit (a 0..1 ramp between START and FULL), and if any is warm it holds
+# both fans at that fraction of their range. It never sets a fan below Apple's own target, and hands
+# the fans back to Auto after 30 s of everything being cool, and on any exit.
+# Runs as root from /Library/LaunchDaemons/local.fanassist.plist (see install.sh).
+SMC=/usr/local/libexec/smc
+LOG=/Library/Logs/fanassist.log
+#       name     keys            START FULL
+RAMPS=("cpu      TC0F            78    94"
+       "gpu      TGDD            70    88"
+       "heatpipe Th1H            68    80"
+       "battery  TB0T,TB1T,TB2T  44    50")
+RELEASE_N=15 STEP_DOWN=250
+
+say() { echo "$(date '+%F %T') $*" >> "$LOG"; }
+rd() { "$SMC" -k "$1" -r | awk '{for(i=2;i<NF;i++) if($i ~ /]$/){if($(i+1) ~ /^-?[0-9.]+$/) print $(i+1); exit}}'; }
+hex() { perl -e 'print unpack("H*", pack("f<", $ARGV[0]))' "$1"; }
+mode() { "$SMC" -k F0Md -w "0$1" >/dev/null; "$SMC" -k F1Md -w "0$1" >/dev/null; }
+release() { mode 0; say "$1: fans back on Auto"; }
+trap 'release stopped' EXIT
+trap 'exit 0' TERM INT HUP
+
+mn=($(rd F0Mn) $(rd F1Mn)) mx=($(rd F0Mx) $(rd F1Mx))
+[ ${#mn[@]} = 2 ] && [ ${#mx[@]} = 2 ] || { say "can't read fan limits (F0Mn/F1Mn/F0Mx/F1Mx); is this a 2-fan Intel Mac?"; exit 1; }
+for r in "${RAMPS[@]}"; do for k in $(echo "$r" | awk '{print $2}' | tr , ' '); do
+  [ -n "$(rd "$k")" ] || say "sensor $k not found on this Mac; it will be ignored"
+done; done
+say "started: fans ${mn[0]}-${mx[0]} / ${mn[1]}-${mx[1]} rpm"
+held=0 cool=0 cur=(0 0)
+while :; do
+  d=0 why=""
+  for r in "${RAMPS[@]}"; do
+    read -r name keys lo hi <<< "$r"
+    t=0; for k in ${keys//,/ }; do v=$(rd "$k"); [ -z "$v" ] && continue; t=$(awk -v a="$t" -v b="$v" 'BEGIN{print (b>a)?b:a}'); done
+    f=$(awk -v t="$t" -v lo="$lo" -v hi="$hi" 'BEGIN{f=(t-lo)/(hi-lo); if(f<0)f=0; if(f>1)f=1; printf "%.2f", f}')
+    if awk -v f="$f" -v d="$d" 'BEGIN{exit !(f>d)}'; then d=$f why="$name ${t%.*}C"; fi
+  done
+  if [ "$d" != 0.00 ] && [ "$d" != 0 ]; then
+    cool=0
+    if [ "$held" = 0 ]; then auto=($(rd F0Tg) $(rd F1Tg)); held=1; say "take over at $why (demand $d)"; fi
+    for i in 0 1; do
+      want=$(awk -v d="$d" -v a="${mn[$i]}" -v b="${mx[$i]}" -v f="${auto[$i]}" -v c="${cur[$i]}" -v s="$STEP_DOWN" \
+        'BEGIN{w=a+d*(b-a); if(w<f)w=f; if(c>0 && w<c-s)w=c-s; printf "%.0f", w}')
+      cur[$i]=$want
+    done
+    mode 1; "$SMC" -k F0Tg -w "$(hex "${cur[0]}")" >/dev/null; "$SMC" -k F1Tg -w "$(hex "${cur[1]}")" >/dev/null
+    [ $((SECONDS % 60)) -lt 2 ] && say "holding ${cur[0]}/${cur[1]} rpm for $why (demand $d)"
+  elif [ "$held" = 1 ]; then
+    cool=$((cool+1))
+    [ "$cool" -ge "$RELEASE_N" ] && { release "all cool"; held=0 cool=0 cur=(0 0); }
+  fi
+  sleep 2
+done
