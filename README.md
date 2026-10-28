@@ -17,9 +17,9 @@ This README is also the story of how I got here, because most of what I tried fi
 
 ### 1. Dirty fans and dried-out paste
 
-The Mac ran hot and loud for years. When it was opened, the fans were filthy and the factory thermal paste had dried into something like paint chips. I cleaned the fans and replaced the paste with a **Honeywell PTM7950** phase-change pad. It's a sheet that melts into the gaps at operating temperature and doesn't pump out or dry out the way paste does.
+The Mac ran hot and loud for years. My local repair shop, MacBook Clinic and [Orramac Computer Services](https://orramac.com) in Framingham, Massachusetts, opened it up. The fans were filthy and the factory thermal paste had dried into something like paint chips. They cleaned the fans and replaced the paste with a **Honeywell PTM7950** phase-change pad. It's a sheet that melts into the gaps at operating temperature and doesn't pump out or dry out the way paste does. (They also take Macs by mail if you'd rather not open yours.)
 
-If you're doing this yourself, iFixit's teardown of this model shows how it comes apart: [MacBook Pro 16" 2019 Teardown](https://www.ifixit.com/Teardown/MacBook+Pro+16-Inch+2019+Teardown/128106). iFixit rates it 1 out of 10 for repairability. The CPU and GPU share one heatsink and heatpipe assembly, which turns out to matter a lot (see section 5).
+If you'd rather do it yourself, iFixit's teardown of this model shows how it comes apart: [MacBook Pro 16" 2019 Teardown](https://www.ifixit.com/Teardown/MacBook+Pro+16-Inch+2019+Teardown/128106). iFixit rates it 1 out of 10 for repairability. The CPU and GPU share one heatsink and heatpipe assembly, which turns out to matter a lot (see section 5).
 
 The repaste helped, but this chassis still can't shed a sustained full-turbo load. Everything after this is about living within that limit.
 
