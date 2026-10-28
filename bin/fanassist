@@ -5,7 +5,7 @@
 # both fans at that fraction of their range. It never sets a fan below Apple's own target, and hands
 # the fans back to Auto after 30 s of everything being cool, and on any exit.
 # Runs as root from /Library/LaunchDaemons/local.fanassist.plist (see install.sh).
-SMC=/usr/local/libexec/smc
+SMC=/Library/PrivilegedHelperTools/mac-fan-assist/smc
 LOG=/Library/Logs/fanassist.log
 #       name     keys            START FULL
 RAMPS=("cpu      TC0F            78    94"

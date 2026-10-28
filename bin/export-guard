@@ -26,7 +26,7 @@ kill -0 "$ROOT" 2>/dev/null || { echo "no process $ROOT"; exit 1; }
 
 paused=0 pauses=0 peak=0 idle=0 t0=$SECONDS
 # When the autopower service runs, it owns Low Power Mode; only pause/resume here.
-pgrep -f /usr/local/libexec/autopower >/dev/null && auto=1 || auto=0
+pgrep -f /Library/PrivilegedHelperTools/mac-fan-assist/autopower >/dev/null && auto=1 || auto=0
 lpm() { [ "$auto" = 1 ] || sudo -n /usr/bin/pmset -a lowpowermode "$1" 2>/dev/null; }
 finish() {
   [ "$paused" = 1 ] && sig CONT

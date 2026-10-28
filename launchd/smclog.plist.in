@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>com.github.tatsuikeda.smclog</string>
-  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>-I</string><string>/usr/local/libexec/smclog</string></array>
+  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>-I</string><string>/Library/PrivilegedHelperTools/mac-fan-assist/smclog</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>60</integer>

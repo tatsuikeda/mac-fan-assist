@@ -191,6 +191,7 @@ This writes to your Mac's System Management Controller. Here is what's in place 
 - It only ever raises the fans above what macOS asks for.
 - It hands control back to macOS whenever it stops.
 - It never touches CPU power, voltage or frequency.
+- The programs that run as root live in `/Library/PrivilegedHelperTools/mac-fan-assist`. The installer refuses to continue unless that folder, and every folder above it, is owned by root and writable only by root, so nothing running as your user can swap them out.
 - `autopower` and `export-guard` only use Apple's own `pmset` and `powermetrics`.
 
 That said, this is a hobby project tested on one machine. Use it at your own risk.

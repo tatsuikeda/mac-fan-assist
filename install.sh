@@ -43,14 +43,23 @@ if [ -n "$missing" ]; then
 fi
 
 echo "Installing (sudo will ask for your password)..."
-sudo install -d -o root -g wheel /usr/local/libexec /usr/local/bin
-sudo install -o root -g wheel -m 755 "$smc" /usr/local/libexec/smc
+# Programs that run as root live in a folder only root can write to, all the way up, so nothing
+# running as you can swap them out. (Homebrew often makes /usr/local folders user-owned.)
+sudo install -d -o root -g wheel -m 755 /Library/PrivilegedHelperTools/mac-fan-assist
+d=/Library/PrivilegedHelperTools/mac-fan-assist
+while [ "$d" != / ]; do
+  perm=$(/usr/bin/stat -f '%Su %Mp%Lp' "$d")
+  case $perm in "root "*[0145][0145]) ;; *) echo "Refusing to install: $d isn't root-only ($perm)."; exit 1 ;; esac
+  d=$(dirname "$d")
+done
+sudo install -d /usr/local/bin
+sudo install -o root -g wheel -m 755 "$smc" /Library/PrivilegedHelperTools/mac-fan-assist/smc
 sudo install -m 755 bin/export-guard bin/stress-sensors /usr/local/bin/
 
 daemon() {
   local label=com.github.tatsuikeda.$1 plist=/Library/LaunchDaemons/com.github.tatsuikeda.$1.plist
   sudo launchctl bootout "system/$label" 2>/dev/null && sleep 3 || true
-  sudo install -o root -g wheel -m 755 "bin/$1" "/usr/local/libexec/$1"
+  sudo install -o root -g wheel -m 755 "bin/$1" "/Library/PrivilegedHelperTools/mac-fan-assist/$1"
   sed "s/@NAME@/$1/g" launchd/daemon.plist.in | sudo tee "$plist" >/dev/null
   sudo chown root:wheel "$plist"; sudo chmod 644 "$plist"
   sudo launchctl bootstrap system "$plist"
@@ -61,7 +70,7 @@ daemon fanassist
 if [ "$smclog" = 1 ]; then
   plist=$HOME/Library/LaunchAgents/com.github.tatsuikeda.smclog.plist
   launchctl bootout "gui/$(id -u)/com.github.tatsuikeda.smclog" 2>/dev/null && sleep 3 || true
-  sudo install -o root -g wheel -m 755 bin/smclog /usr/local/libexec/smclog
+  sudo install -o root -g wheel -m 755 bin/smclog /Library/PrivilegedHelperTools/mac-fan-assist/smclog
   cp launchd/smclog.plist.in "$plist"
   launchctl bootstrap "gui/$(id -u)" "$plist"
   echo "  smclog running (logs: ~/Library/Logs/smclog/)"
