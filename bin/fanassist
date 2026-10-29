@@ -4,7 +4,7 @@
 # how close each is to its limit (a 0..1 ramp between START and FULL), and if any is warm it holds
 # both fans at that fraction of their range. It never sets a fan below Apple's own target, and hands
 # the fans back to Auto after 30 s of everything being cool, and on any exit.
-# Runs as root from /Library/LaunchDaemons/local.fanassist.plist (see install.sh).
+# Runs as root from /Library/LaunchDaemons/com.github.tatsuikeda.fanassist.plist (see install.sh).
 SMC=/Library/PrivilegedHelperTools/mac-fan-assist/smc
 LOG=/Library/Logs/fanassist.log
 #       name     keys            START FULL
@@ -12,11 +12,12 @@ RAMPS=("cpu      TC0F            78    94"
        "gpu      TGDD            70    88"
        "heatpipe Th1H            68    80"
        "battery  TB0T,TB1T,TB2T  44    50")
-RELEASE_N=15 STEP_DOWN=250
+RELEASE_N=15 STEP_DOWN=250 THERM_N=5
 
 say() { echo "$(date '+%F %T') $*" >> "$LOG"; }
 rd() { "$SMC" -k "$1" -r | awk '{for(i=2;i<NF;i++) if($i ~ /]$/){if($(i+1) ~ /^-?[0-9.]+$/) print $(i+1); exit}}'; }
 hex() { perl -e 'print unpack("H*", pack("f<", $ARGV[0]))' "$1"; }
+therm() { /usr/bin/pmset -g therm 2>/dev/null | awk '/CPU_Speed_Limit/{gsub(/[^0-9]/,"",$NF); print $NF+0; exit}'; }
 mode() { "$SMC" -k F0Md -w "0$1" >/dev/null; "$SMC" -k F1Md -w "0$1" >/dev/null; }
 release() { mode 0; say "$1: fans back on Auto"; }
 trap 'release stopped' EXIT
@@ -27,16 +28,30 @@ mn=($(rd F0Mn) $(rd F1Mn)) mx=($(rd F0Mx) $(rd F1Mx))
 for r in "${RAMPS[@]}"; do for k in $(echo "$r" | awk '{print $2}' | tr , ' '); do
   [ -n "$(rd "$k")" ] || say "sensor $k not found on this Mac; it will be ignored"
 done; done
+# An instance killed outright (SIGKILL after a stop timeout, panic) never runs its exit handler
+# and leaves the fans forced at its last target. Clear that before we start.
+mode 0
 say "started: fans ${mn[0]}-${mx[0]} / ${mn[1]}-${mx[1]} rpm"
-held=0 cool=0 cur=(0 0)
+held=0 cool=0 cur=(0 0) tick=0 thr=0
 while :; do
-  d=0 why=""
+  d=0 why="" tick=$((tick+1))
   for r in "${RAMPS[@]}"; do
     read -r name keys lo hi <<< "$r"
     t=0; for k in ${keys//,/ }; do v=$(rd "$k"); [ -z "$v" ] && continue; t=$(awk -v a="$t" -v b="$v" 'BEGIN{print (b>a)?b:a}'); done
     f=$(awk -v t="$t" -v lo="$lo" -v hi="$hi" 'BEGIN{f=(t-lo)/(hi-lo); if(f<0)f=0; if(f>1)f=1; printf "%.2f", f}')
     if awk -v f="$f" -v d="$d" 'BEGIN{exit !(f>d)}'; then d=$f why="$name ${t%.*}C"; fi
   done
+  # Once we force the fans, F0Tg reads back what we wrote, so macOS's live request is invisible and
+  # the floor recorded at takeover goes stale. macOS also throttles for heat we don't sample (SSD,
+  # Thunderbolt, VRMs). Watch its CPU speed limit instead: if it drops while we hold, our level is
+  # too low for whatever is actually hot, so go to full fans until it clears.
+  if [ "$held" = 1 ] && [ $((tick % THERM_N)) = 0 ]; then
+    l=$(therm)
+    if [ -n "$l" ] && [ "$l" -lt 100 ]; then thr=$((thr+1)); else thr=0; fi
+    [ "$thr" = 2 ] && say "macOS throttling to ${l}% while we hold: going to full fans"
+  fi
+  # Measured every THERM_N ticks, but applied on every one, or the target would sawtooth.
+  [ "$thr" -ge 2 ] && { d=1.00; why="macOS throttle ${l}%"; }
   if [ "$d" != 0.00 ] && [ "$d" != 0 ]; then
     cool=0
     if [ "$held" = 0 ]; then auto=($(rd F0Tg) $(rd F1Tg)); held=1; say "take over at $why (demand $d)"; fi
@@ -49,7 +64,7 @@ while :; do
     [ $((SECONDS % 60)) -lt 2 ] && say "holding ${cur[0]}/${cur[1]} rpm for $why (demand $d)"
   elif [ "$held" = 1 ]; then
     cool=$((cool+1))
-    [ "$cool" -ge "$RELEASE_N" ] && { release "all cool"; held=0 cool=0 cur=(0 0); }
+    [ "$cool" -ge "$RELEASE_N" ] && { release "all cool"; held=0 cool=0 cur=(0 0) thr=0; }
   fi
   sleep 2
 done
