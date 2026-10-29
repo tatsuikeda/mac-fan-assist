@@ -1,7 +1,7 @@
 #!/bin/bash
 # Automatic power mode: Low Power Mode stays off for snappy bursts, and turns on when the CPU
 # stays hot (HOT C for HOT_N samples, 2 s apart). It turns off again after COOL_N samples at or
-# below COOL C. Runs as root from /Library/LaunchDaemons/local.autopower.plist.
+# below COOL C. Runs as root from /Library/LaunchDaemons/com.github.tatsuikeda.autopower.plist.
 # Installed by install.sh --with-autopower.
 HOT=${HOT:-90} HOT_N=${HOT_N:-3} COOL=${COOL:-75} COOL_N=${COOL_N:-30}
 LOG=/Library/Logs/autopower.log

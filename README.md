@@ -105,10 +105,12 @@ It takes the highest demand and sets both fans to that fraction of their range. 
 
 Safety rules:
 
-- **Never below macOS.** When it takes over, it records the speed macOS was asking for and never goes below it.
+- **Never below macOS.** When it takes over, it records the speed macOS was asking for and never goes below it. Note that once the fans are forced, `F0Tg` reads back whatever `fanassist` wrote, so macOS's live request is no longer visible and that floor is only as fresh as the moment of takeover.
+- **Throttle watchdog.** Because of that, every 10 seconds while it holds the fans it reads the CPU speed limit (`pmset -g therm`). If macOS is throttling, something `fanassist` doesn't sample is hot and its fan level is too low for it, so it goes to full fans until the limit clears. This catches the section 4 failure automatically instead of by hand.
 - **Smooth slow-downs.** Speeds go up immediately but come down at most 250 rpm every 2 seconds, so the fans don't surge.
 - **Hands back to Auto** after 30 seconds of everything being cool.
 - **Hands back to Auto on exit,** however it stops (uninstall, crash, `launchctl bootout`). If it crashes, launchd restarts it within 30 seconds.
+- **Clears a stuck forced mode at startup.** An instance killed outright (SIGKILL after a stop timeout, or a panic) never runs its exit handler and leaves the fans pinned at its last target. Every start sets the fans back to Auto first, so a restart can't inherit that.
 
 To tune it, edit the `RAMPS` block at the top of `bin/fanassist` and rerun `./install.sh`.
 
@@ -143,6 +145,8 @@ To remove everything and put the fans back on Auto:
 ```bash
 ./uninstall.sh
 ```
+
+`autopower` switches Low Power Mode on as it stops, so if you installed it, `uninstall.sh` switches it back off for you. If you didn't, it leaves Low Power Mode alone.
 
 ### Optional: iSMC
 
