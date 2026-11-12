@@ -212,3 +212,8 @@ Both take Macs by mail from anywhere in the US, so you don't need to be local. I
 ## License
 
 MIT, see [LICENSE](LICENSE). The `smc` tool that the installer builds belongs to smcFanControl and is licensed under the GPL v2. It is downloaded and built on your Mac, not distributed here.
+
+
+## About the author
+
+Built by Tatsu Ikeda of [Tech Health Ventures](https://techhealthventures.com), an AI, IT and engineering consultancy in Boston. More free tools are listed at [techhealthventures.com/open-source](https://techhealthventures.com/open-source).
